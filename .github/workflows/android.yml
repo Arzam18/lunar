@@ -33,10 +33,16 @@ jobs:
         run: cargo install cargo-ndk
 
       - name: Build Lunar for Android
+        env:
+          RUSTFLAGS: ""
+          CARGO_ENCODED_RUSTFLAGS: ""
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS: ""
         run: |
+          # Clears both build-level and target-level rustflags
           cargo ndk -t arm64-v8a --platform 24 build \
             --release \
-            --config 'build.rustflags=[]'
+            --config 'build.rustflags=[]' \
+            --config 'target.aarch64-linux-android.rustflags=[]'
           
           mkdir -p dist/bin
           cp target/aarch64-linux-android/release/lunar dist/bin/lunar
