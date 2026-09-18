@@ -2,10 +2,11 @@ name: Build Android
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ "*" ]
-  pull_request:
-    branches: [ "*" ]
+    inputs:
+      uci_date:
+        description: "UCI version/date (e.g. 20260918)"
+        required: true
+        default: "20260918"
 
 permissions:
   contents: write
@@ -21,6 +22,43 @@ jobs:
           submodules: recursive
           lfs: true
           fetch-depth: 1
+
+      - name: Set UCI Version
+        shell: bash
+        env:
+          UCI_DATE: ${{ inputs.uci_date }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          version = os.environ["UCI_DATE"]
+
+          if not version.isdigit():
+              raise SystemExit("uci_date must contain digits only, e.g. 20260918")
+
+          if len(version) != 8:
+              raise SystemExit("uci_date must be exactly 8 digits, e.g. 20260918")
+
+          path = Path("Cargo.toml")
+          text = path.read_text(encoding="utf-8")
+
+          old = 'version = "0.4.0"'
+          new = f'version = "{version}"'
+
+          if old not in text:
+              raise SystemExit(
+                  'Could not find expected Lunar version line: version = "0.4.0"'
+              )
+
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8")
+
+          print(f"Patched Lunar Cargo.toml version to {version}")
+          PY
+
+          echo "VERSION=${UCI_DATE}" >> "$GITHUB_ENV"
+          echo "Building Lunar UCI version: ${UCI_DATE}"
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -43,7 +81,7 @@ jobs:
             --release \
             --config 'build.rustflags=[]' \
             --config 'target.aarch64-linux-android.rustflags=[]'
-          
+
           mkdir -p dist/bin
           cp target/aarch64-linux-android/release/lunar dist/bin/lunar
 
