@@ -46,30 +46,74 @@ jobs:
           version = os.environ["UCI_DATE"]
 
           if not version.isdigit():
-              raise SystemExit("uci_date must contain digits only, e.g. 20260918")
+              raise SystemExit(
+                  "uci_date must contain digits only, e.g. 20260918"
+              )
 
           if len(version) != 8:
-              raise SystemExit("uci_date must be exactly 8 digits, e.g. 20260918")
+              raise SystemExit(
+                  "uci_date must be exactly 8 digits, e.g. 20260918"
+              )
 
-          path = Path("Cargo.toml")
+          # Lunar's UCI version is defined as:
+          #
+          # const VERSION: &str = env!("CARGO_PKG_VERSION");
+          #
+          # Do NOT modify Cargo.toml because Cargo requires a valid
+          # semantic version. Instead, replace the source constant
+          # with the manually supplied date for this CI build.
+
+          candidates = []
+
+          for path in Path(".").rglob("*.rs"):
+              if any(part in {".git", "target"} for part in path.parts):
+                  continue
+
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except (UnicodeDecodeError, OSError):
+                  continue
+
+              if 'const VERSION: &str = env!("CARGO_PKG_VERSION");' in text:
+                  candidates.append(path)
+
+          if len(candidates) == 0:
+              raise SystemExit(
+                  'Could not find Lunar UCI version line: '
+                  'const VERSION: &str = env!("CARGO_PKG_VERSION");'
+              )
+
+          if len(candidates) > 1:
+              raise SystemExit(
+                  "Found multiple possible Lunar UCI version lines:\n"
+                  + "\n".join(str(p) for p in candidates)
+              )
+
+          path = candidates[0]
           text = path.read_text(encoding="utf-8")
 
-          old = 'version = "0.4.0"'
-          new = f'version = "{version}"'
+          old = 'const VERSION: &str = env!("CARGO_PKG_VERSION");'
+          new = f'const VERSION: &str = "{version}";'
 
           if old not in text:
               raise SystemExit(
-                  'Could not find expected Lunar version line: version = "0.4.0"'
+                  f"Expected version line was not found in {path}"
               )
 
           text = text.replace(old, new, 1)
           path.write_text(text, encoding="utf-8")
 
-          print(f"Patched Lunar version to {version}")
+          print(f"Patched Lunar UCI version in {path}")
+          print(f"UCI version: {version}")
           PY
 
           echo "VERSION=${UCI_DATE}" >> "$GITHUB_ENV"
-          echo "Building Lunar UCI version: ${UCI_DATE}"
+
+      - name: Show Patched UCI Version
+        run: |
+          grep -R 'const VERSION' --include='*.rs' -n . \
+            --exclude-dir=.git \
+            --exclude-dir=target || true
 
       - name: Build Lunar for Android
         env:
@@ -81,7 +125,7 @@ jobs:
             --release \
             --config 'build.rustflags=[]' \
             --config 'target.aarch64-linux-android.rustflags=[]'
-          
+
           mkdir -p dist/bin
           cp target/aarch64-linux-android/release/lunar dist/bin/lunar
 
