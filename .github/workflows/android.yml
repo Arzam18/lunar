@@ -32,7 +32,7 @@ jobs:
         run: rustup target add aarch64-linux-android
 
       - name: Install cargo-ndk
-        run: cargo install cargo-ndk
+        run: cargo install cargo-ndk --locked
 
       - name: Set UCI Version
         shell: bash
