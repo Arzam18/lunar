@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       uci_date:
-        description: "UCI version/date (e.g. 20260611)"
+        description: "UCI version/date (e.g. 20260918)"
         required: true
-        default: "20260611"
+        default: "20260918"
 
 permissions:
   contents: write
@@ -22,6 +22,17 @@ jobs:
           submodules: recursive
           lfs: true
           fetch-depth: 1
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Ensure Target for Active Toolchain
+        run: rustup target add aarch64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
 
       - name: Set UCI Version
         shell: bash
@@ -54,22 +65,11 @@ jobs:
           text = text.replace(old, new, 1)
           path.write_text(text, encoding="utf-8")
 
-          print(f"Patched Lunar Cargo.toml version to {version}")
+          print(f"Patched Lunar version to {version}")
           PY
 
           echo "VERSION=${UCI_DATE}" >> "$GITHUB_ENV"
           echo "Building Lunar UCI version: ${UCI_DATE}"
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-
-      - name: Ensure Target for Active Toolchain
-        run: rustup target add aarch64-linux-android
-
-      - name: Install cargo-ndk
-        run: cargo install cargo-ndk
 
       - name: Build Lunar for Android
         env:
@@ -81,7 +81,7 @@ jobs:
             --release \
             --config 'build.rustflags=[]' \
             --config 'target.aarch64-linux-android.rustflags=[]'
-
+          
           mkdir -p dist/bin
           cp target/aarch64-linux-android/release/lunar dist/bin/lunar
 
